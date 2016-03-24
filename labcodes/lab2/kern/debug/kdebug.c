@@ -293,7 +293,7 @@ read_eip(void) {
  * */
 void
 print_stackframe(void) {
-     /* LAB1 YOUR CODE : STEP 1 */
+     /* LAB1 2013011413 : STEP 1 */
      /* (1) call read_ebp() to get the value of ebp. the type is (uint32_t);
       * (2) call read_eip() to get the value of eip. the type is (uint32_t);
       * (3) from 0 .. STACKFRAME_DEPTH
@@ -305,5 +305,33 @@ print_stackframe(void) {
       *           NOTICE: the calling funciton's return addr eip  = ss:[ebp+4]
       *                   the calling funciton's ebp = ss:[ebp]
       */
+	// My Code Starts
+	uint32_t current_ebp = read_ebp();
+	uint32_t current_eip = read_eip();
+	
+	int i;    //  ‘for’ loop initial declarations are not allowed here
+	for (i = 0; i < STACKFRAME_DEPTH; i++) {
+		if (current_ebp == 0) {
+			break;
+		}
+
+		cprintf("ebp:0x%08x eip:0x%08x ", current_ebp, current_eip);
+		// Cannot use printf, since we're writing a kernel, not an app!
+	    
+		cprintf("args:");
+		uint32_t *argbase = (uint32_t*)current_ebp + 2;       
+		// the first argument is 2 words away, return_address standing in between
+		int j;
+		for (j = 0; j < 4; j++) {
+			cprintf("0x%08x ", argbase[j]);
+		}
+		cprintf("\n");
+		print_debuginfo(current_eip - 1);     // eip points to next instruction
+		
+		// moving to next frame on the stack
+		current_eip = *((uint32_t*)current_ebp + 1);    // return address
+		current_ebp = *((uint32_t*)current_ebp);      // ebp of last frame
+	}
+	// My Code Ends
 }
 
