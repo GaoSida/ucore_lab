@@ -37,7 +37,7 @@ kern_init(void) {
 
     //LAB1: CAHLLENGE 1 If you try to do it, uncomment lab1_switch_test()
     // user/kernel mode switch test
-    // lab1_switch_test();
+    lab1_switch_test();
 
     /* do nothing */
     while (1);
@@ -85,7 +85,15 @@ static void
 lab1_switch_to_user(void) {
     //LAB1 CHALLENGE 1 : TODO
 	// My Code starts
-	
+	// 转向用户态，用户态的栈上信息要多出SS和ESP，因此需要先把栈顶向下拉出两个字节
+	// 然后在产生转向用户态的中断。这样栈上就预先有了两个字，就像用户态一样
+	asm volatile (
+	    "sub $0x8, %%esp \n"
+	    "int %0 \n"
+	    "movl %%ebp, %%esp"  // 完成这个函数的返回
+	    : 
+	    : "i"(T_SWITCH_TOU)  // 输入的变量，i表示常数
+	);
 	// My Code ends
 }
 
@@ -93,7 +101,13 @@ static void
 lab1_switch_to_kernel(void) {
     //LAB1 CHALLENGE 1 :  TODO
 	// My Code starts
-	
+	// 转向核心态，则栈上不会多东西，所以不同预先处理栈
+	asm volatile (
+	    "int %0 \n"
+	    "movl %%ebp, %%esp \n"
+	    : 
+	    : "i"(T_SWITCH_TOK)
+	);
 	// My Code ends
 }
 

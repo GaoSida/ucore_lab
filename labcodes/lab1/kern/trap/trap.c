@@ -177,16 +177,37 @@ trap_dispatch(struct trapframe *tf) {
         break;
     //LAB1 CHALLENGE 1 : 2013011413 you should modify below codes.
     case T_SWITCH_TOU:
-		// change segment registers ro User Mode
-		tf->tf_cs = USER_CS;
-		tf->tf_ds = USER_DS;
-		tf->tf_es = USER_DS;
-		tf->tf_fs = USER_DS;
-		tf->tf_gs = USER_DS;
-		tf->tf_ss = USER_DS;
-		// 
+		// 如果当前不是用户态才转换
+		if (tf->tf_cs != USER_CS) {
+			// 构造一个新的Trap帧，首先是改变其中的特权级标志
+            switchk2u = *tf;
+            switchk2u.tf_cs = USER_CS;
+            switchk2u.tf_ds = switchk2u.tf_es = switchk2u.tf_ss = USER_DS;
+			
+			// 返回的栈的基址，就是除开压入的栈的大小的地址。从trap帧向上找即可。
+			// 这里减去的8是SS和ESP对应的8字节
+            switchk2u.tf_esp = (uint32_t)tf + sizeof(struct trapframe) - 8;
+			
+            // FL开头的宏是为了更改EFLAGS的标志位存在的。
+			// 这里把IO的权限设置为3，即用户态也能输出
+            switchk2u.tf_eflags |= FL_IOPL_MASK;
+			
+            // 用构造的假trap帧替换原来的帧
+            *((uint32_t *)tf - 1) = (uint32_t)&switchk2u;
+        } 
+		break;
     case T_SWITCH_TOK:
-        panic("T_SWITCH_** ??\n");
+        if (tf->tf_cs != KERNEL_CS) {
+			// 完全逆向上面的处理
+            tf->tf_cs = KERNEL_CS;
+            tf->tf_ds = tf->tf_es = KERNEL_DS;
+            tf->tf_eflags &= ~FL_IOPL_MASK;
+			// 这里伪造一个内核态的trap frame，也就是不含ESP和SS这两项
+            switchu2k = (struct trapframe *)(tf->tf_esp - (sizeof(struct trapframe) - 8));
+			// 把伪造的值赋过来
+            memmove(switchu2k, tf, sizeof(struct trapframe) - 8);
+            *((uint32_t *)tf - 1) = (uint32_t)switchu2k;
+        }
         break;
     case IRQ_OFFSET + IRQ_IDE1:
     case IRQ_OFFSET + IRQ_IDE2:
