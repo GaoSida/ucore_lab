@@ -198,6 +198,7 @@ page_init(void) {
         cprintf("  memory: %08llx, [%08llx, %08llx], type = %d.\n",
                 memmap->map[i].size, begin, end - 1, memmap->map[i].type);
         if (memmap->map[i].type == E820_ARM) {
+			// ARM: not reserved
             if (maxpa < end && begin < KMEMSIZE) {
                 maxpa = end;
             }
@@ -207,22 +208,28 @@ page_init(void) {
         maxpa = KMEMSIZE;
     }
 
-    extern char end[];
-
+    extern char end[];   // 此end为kernel的结尾，也正是可分配的内存页的开始
+	// 按照看到的最大物理地址，计算出页数
     npage = maxpa / PGSIZE;
     pages = (struct Page *)ROUNDUP((void *)end, PGSIZE);
-
+	// 全设置为reserved, 即比内核end更高的地址全都被保留
+	// 测试
+	cprintf("maxpa: %08llx, end: %08llx, npage: %08llx, pages: %08llx",
+			maxpa, (uint64_t)&end, (uint64_t)npage, (uint64_t)pages);
+	
+	
     for (i = 0; i < npage; i ++) {
         SetPageReserved(pages + i);
     }
 
-    uintptr_t freemem = PADDR((uintptr_t)pages + sizeof(struct Page) * npage);
+    uintptr_t freemem = PADDR((uintptr_t)pages + sizeof(struct Page) * npage);  // kernel地址转物理地址
+	// 上面这个是kernel的最大地址，比这个高才是可以分配的
 
     for (i = 0; i < memmap->nr_map; i ++) {
         uint64_t begin = memmap->map[i].addr, end = begin + memmap->map[i].size;
         if (memmap->map[i].type == E820_ARM) {
             if (begin < freemem) {
-                begin = freemem;
+                begin = freemem;     // 比freemem小都保留了
             }
             if (end > KMEMSIZE) {
                 end = KMEMSIZE;

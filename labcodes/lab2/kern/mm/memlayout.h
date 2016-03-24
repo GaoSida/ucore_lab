@@ -77,11 +77,12 @@
 typedef uintptr_t pte_t;
 typedef uintptr_t pde_t;
 
-// some constants for bios interrupt 15h AX = 0xE820
+// some constants for bios interrupt 15h AX = 0xE820 （系统调用的参数）
 #define E820MAX             20      // number of entries in E820MAP
 #define E820_ARM            1       // address range memory
 #define E820_ARR            2       // address range reserved
 
+// BIOS的系统调用之后就填好了
 struct e820map {
     int nr_map;
     struct {
@@ -119,6 +120,7 @@ struct Page {
     to_struct((le), struct Page, member)
 
 /* free_area_t - maintains a doubly linked list to record free (unused) pages */
+// 确实是存在内存块的头部的
 typedef struct {
     list_entry_t free_list;         // the list header
     unsigned int nr_free;           // # of free pages in this free list
