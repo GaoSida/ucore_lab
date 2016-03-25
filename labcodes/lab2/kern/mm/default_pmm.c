@@ -75,11 +75,12 @@ default_init_memmap(struct Page *base, size_t n) {
         assert(PageReserved(p));   // 之前已经设为了reserved
         p->flags = p->property = 0;
 		ClearPageProperty(p);
+		ClearPageReserved(p); // 这一页是可以分配的，所以清掉reserved
         set_page_ref(p, 0);   // 引用计数设置为0
     }
 	// 只有第一页要设置空闲页号为n, 只管理空闲区号的第一页即可
     base->property = n;
-    SetPageProperty(base);
+    SetPageProperty(base);    // 空闲块的头部property设置为1
     nr_free += n;
     list_add(&free_list, &(base->page_link));  // 向后顺序加，按地址递增
 }
@@ -106,8 +107,7 @@ default_alloc_pages(size_t n) {
 		// 首先把已经分配的n块设为不可用
 		struct Page *current_page = page;
 		for (; current_page != page + n; current_page++) {
-			ClearPageProperty(current_page);
-			ClearPageReserved(current_page);
+			ClearPageProperty(current_page);    // 分配出去后，property设为1
 		}
         if (page->property > n) {
             struct Page *p = page + n;    // 剩下那块的首地址
@@ -127,8 +127,7 @@ default_free_pages(struct Page *base, size_t n) {
 	// 更改base处的标志位
 	base->flags = 0;
 	base->property = n;
-	SetPageReserved(base);
-	SetPageProperty(base);
+	SetPageProperty(base);    // 空闲的property设成1
 	set_page_ref(base, 0);
 	
 	// 遍历链表寻求找插入位置
@@ -165,7 +164,7 @@ default_free_pages(struct Page *base, size_t n) {
 }
 
 /*
-用这种办法循环一遍，则无法通过测试
+用这种办法循环一遍，则无法通过测试（这种实现也完全没有道理，仅仅作为错误保留在此）
 static void
 default_free_pages(struct Page *base, size_t n) {
     assert(n > 0);
