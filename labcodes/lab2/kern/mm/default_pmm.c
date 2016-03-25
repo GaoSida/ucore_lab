@@ -74,10 +74,10 @@ default_init_memmap(struct Page *base, size_t n) {
 		// 初始化这一块的每一页
         assert(PageReserved(p));   // 之前已经设为了reserved
         p->flags = p->property = 0;
-		SetPageProperty(p);   // 把该页设置为valid
+		ClearPageProperty(p);
         set_page_ref(p, 0);   // 引用计数设置为0
     }
-	// 只有第一页要设置空闲页号为n
+	// 只有第一页要设置空闲页号为n, 只管理空闲区号的第一页即可
     base->property = n;
     SetPageProperty(base);
     nr_free += n;
@@ -124,14 +124,13 @@ default_alloc_pages(size_t n) {
 static void
 default_free_pages(struct Page *base, size_t n) {
 	assert(n > 0);
-
+	// 更改base处的标志位
 	base->flags = 0;
 	base->property = n;
 	SetPageReserved(base);
 	SetPageProperty(base);
 	set_page_ref(base, 0);
 	
-
 	// 遍历链表寻求找插入位置
     list_entry_t *le = list_next(&free_list);
     struct Page *p;
@@ -166,6 +165,7 @@ default_free_pages(struct Page *base, size_t n) {
 }
 
 /*
+用这种办法循环一遍，则无法通过测试
 static void
 default_free_pages(struct Page *base, size_t n) {
     assert(n > 0);
@@ -178,37 +178,8 @@ default_free_pages(struct Page *base, size_t n) {
     }
     base->property = n;
     SetPageProperty(base);
-
-	// 遍历链表寻求找插入位置
-    list_entry_t *le = list_next(&free_list);
-    while (le != &free_list) {
-        p = le2page(le, page_link);
-		// 这次遍历首先要找到刚好在base块后面的那一个空闲页
-		if (p >= base + n) {
-			break;
-		}
-		le = list_next(le);
-	}
-
-	// 当前的le就是链表的下一项
-	list_add_before(le, &(base->page_link));
-
-	// 向后合并
-    if (base + base->property == p) {
-        base->property += p->property;
-		p->property = 0;
-        list_del(&(p->page_link));
-    }
-    // 向前合并
-	p = le2page(list_prev(&(base->page_link)), page_link);
-    if (p + p->property == base) {
-        p->property += base->property;
-        base->property = 0;
-        list_del(&(base->page_link));
-    }
-
-    nr_free += n;
-    return;
+	
+    ……后面的实现一致
 }
 */
 
