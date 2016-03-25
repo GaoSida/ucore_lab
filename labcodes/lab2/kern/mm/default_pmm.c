@@ -142,25 +142,22 @@ default_free_pages(struct Page *base, size_t n) {
 		if (p >= base + n) {
 			break;
 		}
-	le = list_next(le);
+		le = list_next(le);
 	}
 
 	// 当前的le就是链表的下一项
 	list_add_before(le, &(base->page_link));
 
-	
 	// 向后合并
     if (base + base->property == p) {
         base->property += p->property;
 		p->property = 0;
-        ClearPageProperty(p);
         list_del(&(p->page_link));
     }
     // 向前合并
 	p = le2page(list_prev(&(base->page_link)), page_link);
     if (p + p->property == base) {
         p->property += base->property;
-        ClearPageProperty(base);
         base->property = 0;
         list_del(&(base->page_link));
     }
