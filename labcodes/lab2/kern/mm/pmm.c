@@ -222,14 +222,14 @@ page_init(void) {
         SetPageReserved(pages + i);
     }
 
-    uintptr_t freemem = PADDR((uintptr_t)pages + sizeof(struct Page) * npage);  // pages的结尾地址
+    uintptr_t freemem = PADDR((uintptr_t)pages + sizeof(struct Page) * npage);  // pages的结尾地址,转换成了物理地址(-0xC0000000)
 	// 我们能分配的页地址在页表之后
     for (i = 0; i < memmap->nr_map; i ++) {
         uint64_t begin = memmap->map[i].addr, end = begin + memmap->map[i].size;
         if (memmap->map[i].type == E820_ARM) {
             if (begin < freemem) {
                 begin = freemem;
-				cprintf("begin: %08llx, freemem: %08llx \n", begin, (uint64_t)freemem);
+				// cprintf("begin: %08llx, freemem: %08llx \n", begin, (uint64_t)freemem);
             }
             if (end > KMEMSIZE) {
                 end = KMEMSIZE;

@@ -71,23 +71,28 @@ default_init_memmap(struct Page *base, size_t n) {
     assert(n > 0);
     struct Page *p = base;
     for (; p != base + n; p ++) {
-        assert(PageReserved(p));
+		// 初始化这一块的每一页
+        assert(PageReserved(p));   // 之前已经设为了reserved
         p->flags = p->property = 0;
-        set_page_ref(p, 0);
+		SetPageProperty(p);   // 把该页设置为valid
+        set_page_ref(p, 0);   // 引用计数设置为0
     }
+	// 只有第一页要设置空闲页号为n
     base->property = n;
     SetPageProperty(base);
     nr_free += n;
-    list_add(&free_list, &(base->page_link));
+    list_add(&free_list, &(base->page_link));  // 向后顺序加，按地址递增
 }
 
 static struct Page *
 default_alloc_pages(size_t n) {
+	// 边界判断，避免错误
     assert(n > 0);
     if (n > nr_free) {
         return NULL;
     }
-    struct Page *page = NULL;
+    struct Page *page = NULL;   // 命中的结果
+	// 遍历空闲空间链表
     list_entry_t *le = &free_list;
     while ((le = list_next(le)) != &free_list) {
         struct Page *p = le2page(le, page_link);
@@ -96,15 +101,22 @@ default_alloc_pages(size_t n) {
             break;
         }
     }
+	// 若命中，分配之
     if (page != NULL) {
-        list_del(&(page->page_link));
+		// 首先把已经分配的n块设为不可用
+		struct Page *current_page = page;
+		for (; current_page != page + n; current_page++) {
+			ClearPageProperty(current_page);
+			ClearPageReserved(current_page);   // 释放时检查
+		}
         if (page->property > n) {
-            struct Page *p = page + n;
+            struct Page *p = page + n;    // 剩下那块的首地址
             p->property = page->property - n;
-            list_add(&free_list, &(p->page_link));
-    }
+			// 这一块插在分配出去的那块之后
+            list_add(&(page->page_link), &(p->page_link));
+		}
+		list_del(&(page->page_link));
         nr_free -= n;
-        ClearPageProperty(page);
     }
     return page;
 }
@@ -112,32 +124,43 @@ default_alloc_pages(size_t n) {
 static void
 default_free_pages(struct Page *base, size_t n) {
     assert(n > 0);
+	// 清空这一块的标志
     struct Page *p = base;
     for (; p != base + n; p ++) {
         assert(!PageReserved(p) && !PageProperty(p));
-        p->flags = 0;
+        p->flags = p->property = 0;
         set_page_ref(p, 0);
     }
     base->property = n;
     SetPageProperty(base);
+	// 遍历链表寻求合并
     list_entry_t *le = list_next(&free_list);
     while (le != &free_list) {
         p = le2page(le, page_link);
-        le = list_next(le);
-        if (base + base->property == p) {
-            base->property += p->property;
-            ClearPageProperty(p);
-            list_del(&(p->page_link));
-        }
-        else if (p + p->property == base) {
-            p->property += base->property;
-            ClearPageProperty(base);
-            base = p;
-            list_del(&(p->page_link));
-        }
+		// 这次遍历首先要找到刚好在base块后面的那一个空闲页
+		if (p >= base + n) {
+			break;
+		}
+	}
+	// 当前的le就是链表的下一项
+	list_add_before(le, &(base->page_link));
+	
+	// 向后合并
+    if (base + base->property == p) {
+        base->property += p->property;
+		p->property = 0;
+        ClearPageProperty(p);
+        list_del(&(p->page_link));
+    }
+    // 向前合并
+	p = le2page(list_prev(&(base->page_link)), page_link);
+    if (p + p->property == base) {
+        p->property += base->property;
+        ClearPageProperty(base);
+        base->property = 0;
+        list_del(&(base->page_link));
     }
     nr_free += n;
-    list_add(&free_list, &(base->page_link));
 }
 
 static size_t
