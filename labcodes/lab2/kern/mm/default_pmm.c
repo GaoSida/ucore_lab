@@ -107,7 +107,7 @@ default_alloc_pages(size_t n) {
 		struct Page *current_page = page;
 		for (; current_page != page + n; current_page++) {
 			ClearPageProperty(current_page);
-			ClearPageReserved(current_page);   // 释放时检查
+			ClearPageReserved(current_page);
 		}
         if (page->property > n) {
             struct Page *p = page + n;    // 剩下那块的首地址
@@ -121,6 +121,51 @@ default_alloc_pages(size_t n) {
     return page;
 }
 
+static void
+default_free_pages(struct Page *base, size_t n) {
+	assert(n > 0);
+
+	base->flags = 0;
+	base->property = n;
+	SetPageReserved(base);
+	SetPageProperty(base);
+	set_page_ref(base, 0);
+	
+
+	// 遍历链表寻求找插入位置
+    list_entry_t *le = list_next(&free_list);
+    struct Page *p;
+    while (le != &free_list) {
+        p = le2page(le, page_link);
+		// 这次遍历首先要找到刚好在base块后面的那一个空闲页
+		if (p >= base + n) {
+			break;
+		}
+		le = list_next(le);
+	}
+
+	// 当前的le就是链表的下一项
+	list_add_before(le, &(base->page_link));
+
+	// 向后合并
+    if (base + base->property == p) {
+        base->property += p->property;
+		p->property = 0;
+        list_del(&(p->page_link));
+    }
+    // 向前合并
+	p = le2page(list_prev(&(base->page_link)), page_link);
+    if (p + p->property == base) {
+        p->property += base->property;
+        base->property = 0;
+        list_del(&(base->page_link));
+    }
+
+    nr_free += n;
+    return;
+}
+
+/*
 static void
 default_free_pages(struct Page *base, size_t n) {
     assert(n > 0);
@@ -165,6 +210,7 @@ default_free_pages(struct Page *base, size_t n) {
     nr_free += n;
     return;
 }
+*/
 
 static size_t
 default_nr_free_pages(void) {
