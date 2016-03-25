@@ -379,15 +379,42 @@ get_pte(pde_t *pgdir, uintptr_t la, bool create) {
 #if 0
     pde_t *pdep = NULL;   // (1) find page directory entry
     if (0) {              // (2) check if entry is not present
-                          // (3) check if creating is needed, then alloc page for page table
-                          // CAUTION: this page is used for page table, not for common data page
-                          // (4) set page reference
+		                  // (3) check if creating is needed, then alloc page for page table
+		                  // CAUTION: this page is used for page table, not for common data page
+		                  // (4) set page reference
         uintptr_t pa = 0; // (5) get linear address of page
-                          // (6) clear page content using memset
-                          // (7) set page directory entry's permission
+		                  // (6) clear page content using memset
+		                  // (7) set page directory entry's permission
     }
     return NULL;          // (8) return page table entry
 #endif
+	// 为了避免来回拷贝带来的麻烦，一律使用指针操作
+    pde_t *pde_pointer = &pgdir[PDX(la)];    // 查页目录表找到页表项
+	if (*pde_pointer & PTE_P == 1) {
+		// 该页表存在，则直接查表返回
+		uintptr_t pt_base_pa = PDE_ADDR(*pde_pointer);
+		uintptr_t pt_base_va = KADDR(pt_base_pa);    // 要在ucore里直接访问页表需要转虚拟地址
+		return &((pte_t*)pt_base_va)[PTX(la)];       // 一切传值都是指针形式，避免拷贝
+	}
+	else {
+		// 该页表不存在，要为页表分一页
+		if (!create) {
+			return NULL;
+		}
+		struct Page *page = alloc_page();
+		if (page == NULL) {
+			return NULL;
+		}
+		// 分配内存后，首先给这一页设置引用计数
+		set_page_ref(page, 1);
+		// 然后，初始化这个页表
+		uintptr_t pt_pa = page2pa(page);
+		memset(KADDR(pt_pa), 0, PGSIZE);
+		// 然后，填写页目录表中，对应新页表的这一项，权限使用按位或设置
+		*pde_pointer = pt_pa | PTE_U | PTE_W | PTE_P;
+		// 返回页表项。这时的页表项没有内容，调用者会填写其中的内容。
+		return & ((pte_t*)KADDR(pt_pa))[PTX(la)];
+	}
 }
 
 //get_page - get related Page struct for linear address la using PDT pgdir
@@ -397,7 +424,7 @@ get_page(pde_t *pgdir, uintptr_t la, pte_t **ptep_store) {
     if (ptep_store != NULL) {
         *ptep_store = ptep;
     }
-    if (ptep != NULL && *ptep & PTE_P) {
+    if (ptep != NULL && *ptep & PTE_P) {  // PTE_P是存在位
         return pte2page(*ptep);
     }
     return NULL;
