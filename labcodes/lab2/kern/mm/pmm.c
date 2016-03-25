@@ -212,24 +212,24 @@ page_init(void) {
 	// 按照看到的最大物理地址，计算出页数
     npage = maxpa / PGSIZE;
     pages = (struct Page *)ROUNDUP((void *)end, PGSIZE);
-	// 全设置为reserved, 即比内核end更高的地址全都被保留
 	// 测试
-	cprintf("maxpa: %08llx, end: %08llx, npage: %08llx, pages: %08llx",
-			maxpa, (uint64_t)&end, (uint64_t)npage, (uint64_t)pages);
+	// cprintf("maxpa: %08llx, end: %08llx, npage: %08llx, pages: %08llx \n",
+	//		maxpa, (uint64_t)&end, (uint64_t)npage, (uint64_t)pages);
+	// 这里的end地址是带0xC偏移的，因为现在的ucore正运行在段机制下
 	
-	
+	// 先把所有页设置为reserved，后面再说（init memmap的时候会assert这一点）
     for (i = 0; i < npage; i ++) {
         SetPageReserved(pages + i);
     }
 
-    uintptr_t freemem = PADDR((uintptr_t)pages + sizeof(struct Page) * npage);  // kernel地址转物理地址
-	// 上面这个是kernel的最大地址，比这个高才是可以分配的
-
+    uintptr_t freemem = PADDR((uintptr_t)pages + sizeof(struct Page) * npage);  // pages的结尾地址
+	// 我们能分配的页地址在页表之后
     for (i = 0; i < memmap->nr_map; i ++) {
         uint64_t begin = memmap->map[i].addr, end = begin + memmap->map[i].size;
         if (memmap->map[i].type == E820_ARM) {
             if (begin < freemem) {
-                begin = freemem;     // 比freemem小都保留了
+                begin = freemem;
+				cprintf("begin: %08llx, freemem: %08llx \n", begin, (uint64_t)freemem);
             }
             if (end > KMEMSIZE) {
                 end = KMEMSIZE;
@@ -238,6 +238,7 @@ page_init(void) {
                 begin = ROUNDUP(begin, PGSIZE);
                 end = ROUNDDOWN(end, PGSIZE);
                 if (begin < end) {
+					// 传入的第一个参数是pages数组中的对应项
                     init_memmap(pa2page(begin), (end - begin) / PGSIZE);
                 }
             }
