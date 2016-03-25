@@ -133,7 +133,8 @@ default_free_pages(struct Page *base, size_t n) {
     }
     base->property = n;
     SetPageProperty(base);
-	// 遍历链表寻求合并
+
+	// 遍历链表寻求找插入位置
     list_entry_t *le = list_next(&free_list);
     while (le != &free_list) {
         p = le2page(le, page_link);
@@ -141,9 +142,12 @@ default_free_pages(struct Page *base, size_t n) {
 		if (p >= base + n) {
 			break;
 		}
+	le = list_next(le);
 	}
+
 	// 当前的le就是链表的下一项
 	list_add_before(le, &(base->page_link));
+
 	
 	// 向后合并
     if (base + base->property == p) {
@@ -160,7 +164,9 @@ default_free_pages(struct Page *base, size_t n) {
         base->property = 0;
         list_del(&(base->page_link));
     }
+
     nr_free += n;
+    return;
 }
 
 static size_t
