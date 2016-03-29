@@ -11,7 +11,7 @@
 enum proc_state {
     PROC_UNINIT = 0,  // uninitialized
     PROC_SLEEPING,    // sleeping
-    PROC_RUNNABLE,    // runnable(maybe running)
+    PROC_RUNNABLE,    // runnable(maybe running) 就绪和运行分到了一起
     PROC_ZOMBIE,      // almost dead, and wait parent proc to reclaim his resource
 };
 
