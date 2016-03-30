@@ -1072,6 +1072,7 @@ proc_init(void) {
 
     assert(idleproc != NULL && idleproc->pid == 0);
     assert(initproc != NULL && initproc->pid == 1);
+	cprintf("idleproc %d; initproc %d;", idleproc->pid, initproc->pid);
 }
 
 // cpu_idle - at the end of kern_init, the first kernel thread idleproc will do below works
