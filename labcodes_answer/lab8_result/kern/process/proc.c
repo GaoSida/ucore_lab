@@ -1038,16 +1038,17 @@ void
 proc_init(void) {
     int i;
 
-    list_init(&proc_list);
+    list_init(&proc_list);      // 进程表设为空的
     for (i = 0; i < HASH_LIST_SIZE; i ++) {
         list_init(hash_list + i);
     }
-
+    
+	// 构造新进程
     if ((idleproc = alloc_proc()) == NULL) {
         panic("cannot alloc idleproc.\n");
     }
 
-    idleproc->pid = 0;
+    idleproc->pid = 0;        // 在这里设置了id
     idleproc->state = PROC_RUNNABLE;
     idleproc->kstack = (uintptr_t)bootstack;
     idleproc->need_resched = 1;
@@ -1072,7 +1073,9 @@ proc_init(void) {
 
     assert(idleproc != NULL && idleproc->pid == 0);
     assert(initproc != NULL && initproc->pid == 1);
-	cprintf("idleproc %d; initproc %d;", idleproc->pid, initproc->pid);
+	cprintf("idleproc %d; initproc %d; \n", idleproc->pid, initproc->pid);
+	// 这两个理论上都是线程，看alloc_proc中对于CR3的赋值即可。页表基址一样，表明都是内核线程。
+	// 作为内核线程，他们不会进入用户态。
 }
 
 // cpu_idle - at the end of kern_init, the first kernel thread idleproc will do below works
